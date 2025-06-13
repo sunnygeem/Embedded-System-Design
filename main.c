@@ -11,7 +11,6 @@ int direct = 0;
 int phase = 0;
 int ncount = 0;
 
-<<<<<<< HEAD
 int sensor1 = 0;
 int sensor2 = 0;
 int sensor3 = 0;
@@ -226,165 +225,15 @@ void Turn_Left(int sp)
             direct = direct % 4;
             count = 0;
             break;
-=======
-typedef struct {
-    int x;
-    int y;
-} Coordinate;
-
-Coordinate direct_offset[4] = {
-    {0, 1},   // north
-    {-1, 0},  // west
-    {0, -1},  // south
-    {1, 0},   // east
-};
-
-typedef struct Node Node;
-
-typedef struct Direction {
-    int directNumber;     
-    Node* node;            
-    int visited;          
-} Direction;
-
-typedef struct Node {
-    int x;
-    int y;
-    int id;                  
-    int direction_count;      
-    Direction directions[4]; 
-} Node;
-
-Node* now_node;
-
-#define MAX_NODES 50
-Node node_pool[MAX_NODES];
-int node_pool_index = 0;
-
-
-Node* create_node() {
-    if (node_pool_index >= MAX_NODES) {
-        printf("Error: Maximum number of nodes reached\n");
-        return NULL;
-    }
-    Node* node = &node_pool[node_pool_index];
-    initialize_node(node);
-    return node;
-}
-
-
-void initialize_node(Node* node) {
-    node->x = 0;
-    node->y = 0;
-    node->id = node_pool_index++;
-    node->direction_count = 0;
-    int i;
-    for (i = 0; i < 4; i++) {
-        node->directions[i].directNumber = i;
-        node->directions[i].node = NULL;
-        node->directions[i].visited = 0;
-    }
-}
-
-void add_direction(Node* src, int direction_index, Node* dest, int reverse_direction) {
-    if (src->direction_count < 4) {
-        src->directions[direction_index].node = dest;
-        src->directions[direction_index].visited = 1;
-        src->direction_count++;
-    }
-
-    if (dest->direction_count < 4) {
-        dest->directions[reverse_direction].node = src;
-        dest->directions[reverse_direction].visited = 1;
-        dest->direction_count++;
-    }
-}
-
-Node* find_or_create_node(int direction_index, Node* current) {
-    if (current->directions[direction_index].visited == 0) {
-        Node* new_node;
-        if(!check_next(current->x + direct_offset[direction_index].x,
-                current->y + direct_offset[direction_index].y))
-        {
-            new_node = create_node();
-        }
-        else{
-            new_node = &node_pool[0];
-        }
-        int reverse_direction = (direction_index + 2) % 4;
-        new_node->x = current->x + direct_offset[direction_index].x;
-        new_node->y = current->y + direct_offset[direction_index].y;
-        add_direction(current, direction_index, new_node, reverse_direction);
-
-        return new_node;
-    }
-}
-
-Node* Get_Dest(){
-    int x = now_node->x,y = now_node->y,i;
-    Node* cur;
-    while(1)
-    {
-        x += direct_offset[direct].x;
-        y += direct_offset[direct].y;
-        for(i=0;i<node_pool_index;i++){
-            cur = &node_pool[i];
-            printf("curx: %d, cury : %d, x : %d, y : %d\n",cur->x,cur->y,x,y);
-            if(x == cur->x && y == cur->y){
-                return cur;
-            }
         }
     }
 }
 
-void main(void)
-{
-    Clock_Init48MHz();
-    int sensor1, sensor2, sensor3, sensor4, sensor5, sensor6, sensor7, sensor8;
-    systick_init();
-    sensor_init();
-    motor_init();
-    timer_A3_capture_init();
-    TA3_N_IRQHandler();
-    while (1)
-    {
-        //IRï¿½ï¿½ï¿½ï¿½ Å°ï¿½ï¿½
-        P5->OUT |= 0x08;
-        P9->OUT |= 0x04;
-        P7->DIR = 0xFF;
-        P7->OUT = 0xFF;
-        Clock_Delay1us(10);
-        P7->DIR = 0x00;
-        Clock_Delay1us(1000);
-
-        sensor1 = P7->IN & 0x80;
-        sensor2 = P7->IN & 0x40;
-        sensor3 = P7->IN & 0x20;
-        sensor4 = P7->IN & 0x10;
-        sensor5 = P7->IN & 0x08;
-        sensor6 = P7->IN & 0x04;
-        sensor7 = P7->IN & 0x02;
-        sensor8 = P7->IN & 0x01;
-
-        //ï¿½ï¿½ï¿½îµ¥ -> ï¿½ï¿½ï¿½ï¿½
-        if(sensor4 && sensor5){
-            front();
-            systick_wait1s();
-        }
-        else{
-            move(0, 0);
-            systick_wait1s();
->>>>>>> 97da8feb04fb46c28d52aba81aad35d4921e1f30
-        }
-    }
-}
-
-<<<<<<< HEAD
 void Turn_Right(int sp)
 {
     Left_Forward();
     Right_Backward();
-    Move(sp+300, sp+300);
+    Move(sp, sp);
     count = 0;
     while(1) {
         if (count > 180) {
@@ -438,7 +287,16 @@ void Turn_Right2(int sp, int cnt)
     Move(0,0);
 }
 
+int readLineError() {
+    int result = 0;
 
+    if (sensor2) result -= 2;  // ì˜¤ë¥¸ìª½ ë°”ê¹¥
+    if (sensor3) result -= 1;  // ì˜¤ë¥¸ìª½ ì¤‘ê°„
+    if (sensor4) result += 1;  // ì™¼ìª½ ì¤‘ê°„
+    if (sensor5) result += 2;  // ì™¼ìª½ ë°”ê¹¥
+
+    return result;  // 0ì´ë©´ ì •ì¤‘ì•™, ìŒìˆ˜ë©´ ì˜¤ë¥¸ìª½ ì¹˜ìš°ì¹¨, ì–‘ìˆ˜ë©´ ì™¼ìª½ ì¹˜ìš°ì¹¨
+}
 
 int Search_Straight(int sp) {
 
@@ -452,16 +310,30 @@ int Search_Straight(int sp) {
 
             return 1;
 
-        } else{
+        }
+
+       /* else{
             Left_Forward();
             Right_Forward();
             Move(sp,sp);
-        }
-=======
-        //IRï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
-        P5->OUT &= ~0x08;
-        P9->OUT &= ~0x04;
->>>>>>> 97da8feb04fb46c28d52aba81aad35d4921e1f30
+        }*/
+
+        int error = readLineError();  // ìœ„ í•¨ìˆ˜ ì‚¬ìš©
+        int adjust = error * 50;     // ë¹„ë¡€ ê²Œì¸ê°’ (íŠœë‹ ê°€ëŠ¥)
+
+        int leftDuty = sp - adjust;
+                int rightDuty = sp + adjust;
+
+                // Saturation (duty í•œê³„ê°’)
+                if (leftDuty < 0) leftDuty = 0;
+                if (rightDuty < 0) rightDuty = 0;
+                if (leftDuty > 3000) leftDuty = 3000;
+                if (rightDuty > 3000) rightDuty = 3000;
+
+                Left_Forward();
+                Right_Forward();
+                Move(leftDuty, rightDuty);
+
         Clock_Delay1ms(10);
     }
 }
@@ -472,26 +344,26 @@ typedef struct {
 } Coordinate;
 
 Coordinate direct_offset[4] = {
-    {0, 1},   // 0: ºÏÂÊ
-    {-1, 0},  // 2: ¼­ÂÊ
-    {0, -1},  // 4: ³²ÂÊ
-    {1, 0},   // 6: µ¿ÂÊ
+    {0, 1},   // 0:
+    {-1, 0},  // 2:
+    {0, -1},  // 4:
+    {1, 0},   // 6:
 };
 
 typedef struct Node Node;
 
 typedef struct Direction {
-    int directNumber;       // ¹æÇâ ³Ñ¹ö
-    Node* node;             // ÇØ´ç ¹æÇâÀÇ ³ëµå
-    int explored;           // ÇØ´ç ¹æÇâÀÇ Å½»ö ¿©ºÎ (0: Å½»ö ¾ÈÇÔ, 1: Å½»ö ¿Ï·á)
+    int directNumber;
+    Node* node;
+    int explored;
 } Direction;
 
 typedef struct Node {
     int x;
     int y;
-    int id;                     // ³ëµå ID
-    int direction_count;        // ¿¬°áµÈ ¹æÇâÀÇ ¼ö
-    Direction directions[4];  // ¹æÇâ ¹è¿­
+    int id;
+    int direction_count;
+    Direction directions[4];
 } Node;
 
 Node* now_node;
@@ -591,8 +463,8 @@ void Go_Right(int sp) {
     }
     if(flag == 1){
         phase = 2;
-        now_node->directions[4].explored = 0;
-        Turn_Left2(sp,4);
+        now_node->directions[1].explored = 0;
+        Turn_Left2(sp,2);
     }
 
     if(phase == 0)
@@ -605,7 +477,7 @@ void Go_Right(int sp) {
     }
     if (phase == 1){
         Node* next_node = Get_Dest();
-        printf("Å»Ãâ\n");
+        printf("escape\n");
         int reverse_direction = (direct + 2) % 4;
         add_direction(now_node, direct, next_node, reverse_direction);
         now_node = next_node;
@@ -655,12 +527,12 @@ void main(void) {
     Motor_Init();
     Sensor_Init();
     Timer_A3_Capture_Init();
-    int sp = 2500;
+    int sp = 1500;
     Node* start_node = create_node();
     start_node->x = 0;
     start_node->y = 0;
     now_node = start_node;
-    now_node->directions[2].explored = 1;
+    now_node->directions[1].explored = 1;
 
     while(1) {
         Readysensor();
@@ -671,7 +543,7 @@ void main(void) {
             Move(sp,sp);
             Clock_Delay1ms(200);
 
-            if(sensor2 || sensor6){
+            if(sensor2 || sensor7){
                 Clock_Delay1ms(100);
                 Turn_Left(sp);
                 break;
@@ -683,9 +555,9 @@ void main(void) {
         Readysensor();
         Go_Right(sp);
         if(Is_Back_To_Start(now_node)){
-            Move(0,0);
-            phase = 1;
-            break;
+//            Move(0,0);
+//            phase = 1;
+//            break;
         }
     }
 //    while(1){
