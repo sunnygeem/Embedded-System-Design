@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include "init.h"
 
-#define SPEED 1500
+//#define SPEED 1000
 
 void systick_init()
 {
@@ -70,7 +70,7 @@ void motor_init(void)
     P2->DIR |= 0xC0;
     P2->OUT &= ~0xC0;
 
-    pwm_init34(7500, 0, 0);
+    pwm_init34(15000, 0, 0);
 }
 
 void timer_A3_capture_init()
@@ -156,78 +156,81 @@ void TA3_N_IRQHandler()
     left_count++;
 }
 
-void front(){
+void move_front(uint16_t leftDuty, uint16_t rightDuty, int delay){
     left_forward();
     right_forward();
-    move(SPEED, SPEED);
+    move(leftDuty, rightDuty);
+    Clock_Delay1ms(delay);
 }
 
-void left(){
+void move_left(uint16_t leftDuty, uint16_t rightDuty, int delay){
     left_backward();
     right_forward();
-    move(SPEED,SPEED);
+    move(leftDuty,rightDuty);
+    Clock_Delay1ms(delay);
 }
 
-void left90()
-{
-    while (1)
-    {
-        if (left_count > 180)
-        {
-            left_count = 0;
-            break;
-        }
-        else
-        {
-            left();
-        }
-    }
-    while (1)
-    {
-        if (left_count > 10)
-        {
-            left_count = 0;
-            break;
-        }
-        else
-        {
-            front();
-        }
-    }
+//void left90()
+//{
+//    while (1)
+//    {
+//        if (left_count > 180)
+//        {
+//            left_count = 0;
+//            break;
+//        }
+//        else
+//        {
+//            move_left();
+//        }
+//    }
+//    while (1)
+//    {
+//        if (left_count > 10)
+//        {
+//            left_count = 0;
+//            break;
+//        }
+//        else
+//        {
+//            move_front();
+//        }
+//    }
+//
+//}
 
-}
-
-void right(){
+void move_right(uint16_t leftDuty, uint16_t rightDuty, int delay){
     left_forward();
     right_backward();
-    move(SPEED, SPEED);
+    move(leftDuty, rightDuty);
+    Clock_Delay1ms(delay);
 }
 
-void right90()
-{
-    while (1)
-    {
-        if (left_count > 180)
-        {
-            left_count = 0;
-            break;
-        }
-        else
-        {
-            right();
-        }
-    }
-    while (1)
-    {
-        if (left_count > 10)
-        {
-            left_count = 0;
-            break;
-        }
-        else
-        {
-            front();
-        }
-    }
-
-}
+//void right90()
+//{
+//    while (1)
+//    {
+//        if (left_count > 180)
+//        {
+//            left_count = 0;
+//            break;
+//        }
+//        else
+//        {
+//            move_right();
+//        }
+//    }
+//    while (1)
+//    {
+//        if (left_count > 10)
+//        {
+//            left_count = 0;
+//            break;
+//        }
+//        else
+//        {
+//            move_front();
+//        }
+//    }
+//
+//}

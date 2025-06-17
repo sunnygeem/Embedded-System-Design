@@ -16,13 +16,13 @@ void motor_init(void);
 void timer_A3_capture_init();
 void systick_wait1ms();
 void systick_wait1s();
+uint32_t get_left_rpm();
 void left_forward();
 void left_backward();
 void right_forward();
 void right_backward();
-void front();
-void right();
-void left();
-uint32_t get_left_rpm();
+void move_front(uint16_t leftDuty, uint16_t rightDuty, int delay);
+void move_right(uint16_t leftDuty, uint16_t rightDuty, int delay);
+void move_left(uint16_t leftDuty, uint16_t rightDuty, int delay);
 void move(uint16_t leftDuty, uint16_t rightDuty);
 
