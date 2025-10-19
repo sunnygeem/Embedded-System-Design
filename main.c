@@ -1,224 +1,324 @@
 #include "msp.h"
 #include "Clock.h"
-#include "init.h"
 
-#define LEFT  'l'
-#define RIGHT 'r'
-#define STRAIGHT 's'
-#define BACK 'b'
+#define RED (1 << 0)
+#define GREEN (1 << 1)
+#define BLUE (1 << 2)
 
-#define leftDir 1
-#define frontDir 10
-#define rightDir 100
-#define backDir 1000
-
-char path[1000];     // memorized path in phase1
-char optimized[1000]; // optimzed path throught phase2. will used for phase3
-int path_index = 0;
-int optimized_index = 0;
-
-int sensor1 = 0;
-int sensor2 = 0;
-int sensor3 = 0;
-int sensor4 = 0;
-int sensor5 = 0;
-int sensor6 = 0;
-int sensor7 = 0;
-int sensor8 = 0;
-
-void loadSensor() {
-    P7->DIR = 0xFF;
-    P7->OUT = 0xFF;
-    Clock_Delay1us(1000);
-    P7->DIR = 0x00;
-    Clock_Delay1us(1000);
-
-
-    sensor1 = P7->IN & 0x80;
-    sensor2 = P7->IN & 0x40;
-    sensor3 = P7->IN & 0x20;
-    sensor4 = P7->IN & 0x10;
-    sensor5 = P7->IN & 0x08;
-    sensor6 = P7->IN & 0x04;
-    sensor7 = P7->IN & 0x02;
-    sensor8 = P7->IN & 0x01;
+void Led_Init(void)
+{
+    P2->SEL0 &= ~0x07;
+    P2->SEL1 &= ~0x07;
+    P2->DIR |= 0x07;
+    P2->OUT &= ~0x07;
 }
 
-int direction() {
-    loadSensor();
+void Motor_Init(void)
+{
+    P3->SEL0 &= ~0xC0;
+    P3->SEL1 &= ~0xC0;
+    P3->DIR |= 0xC0;
+    P3->OUT &= ~0xC0;
 
+    P5->SEL0 &= ~0x30;
+    P5->SEL1 &= ~0x30;
+    P5->DIR |= 0x30;
+    P5->OUT &= ~0x30;
+
+    P2->SEL0 &= ~0xC0;
+    P2->SEL1 &= ~0xC0;
+    P2->DIR |= 0xC0;
+    P2->OUT &= ~0xC0;
+
+    PWM_Init34(15000, 0, 0);
+}
+
+void System_Initialize(void)
+{
+    Clock_Init48MHz();
+    Motor_Init();
+}
+
+void PWM_Init34(uint16_t period, uint16_t duty3, uint16_t duty4) {
+    P2 ->DIR |= 0xC0;
+    P2 ->SEL0 |= 0xC0;
+    P2 ->SEL1 &= ~0xC0;
+
+    TIMER_A0->CCTL[0] = 0x800;
+    TIMER_A0->CCR[0] = period;
+
+    TIMER_A0->EX0 = 0x0000;
+
+    TIMER_A0->CCTL[3] = 0x0040;
+    TIMER_A0->CCR[3] = duty3;
+    TIMER_A0->CCTL[4] = 0x0040;
+    TIMER_A0->CCR[4] = duty4;
+
+    TIMER_A0->CTL = 0x02F0;
+}
+
+void Left_Forward() {
+    P5->OUT &= ~0x10;
+}
+
+void Left_Backward() {
+    P5->OUT |= 0x10;
+}
+
+void Right_Forward() {
+    P5->OUT &= ~0x20;
+}
+
+void Right_Backward() {
+    P5->OUT |= 0x20;
+}
+
+void PWM_Duty3(uint16_t duty3) {
+    TIMER_A0->CCR[3] = duty3;
+}
+
+void PWM_Duty4(uint16_t duty4) {
+    TIMER_A0->CCR[4] = duty4;
+}
+
+void Move(uint16_t leftDuty, uint16_t rightDuty) {
+    P3->OUT |= 0xC0;
+    PWM_Duty3(rightDuty);
+    PWM_Duty4(leftDuty);
+}
+
+void moveForward(int leftDuty, int rightDuty, int delay) {
+    Left_Forward();
+    Right_Forward();
+    Move(leftDuty, rightDuty);
+    Clock_Delay1us(delay);
+}
+
+void moveRight(int leftDuty, int rightDuty, int delay) {
+    Left_Forward();
+    Right_Backward();
+    Move(leftDuty, rightDuty);
+    Clock_Delay1us(delay);
+}
+
+void moveLeft(int leftDuty, int rightDuty, int delay) {
+    Left_Backward();
+    Right_Forward();
+    Move(leftDuty, rightDuty);
+    Clock_Delay1us(delay);
+}
+
+void loadSensor() {
+   P7->DIR = 0xFF;
+   P7->OUT = 0xFF;
+   Clock_Delay1us(1000);
+   P7->DIR = 0x00;
+   Clock_Delay1us(1000);
+}
+
+void TurnOn_Led(int color)
+{
+    P2->OUT &= ~0x07;
+    P2->OUT |= color;
+}
+
+void TurnOff_Led(void)
+{
+    P2->OUT &= ~0x07;
+}
+
+//LSRB 0000
+int direction(int duty) {
+    loadSensor();
     int res = 0;
-    if (sensor2 && sensor3)
-        res += leftDir;
-    if (sensor4 && sensor5)
-        res += frontDir;
-    if (sensor6 && sensor7)
-        res += rightDir;
-    if (!sensor1 && !sensor2 && !sensor3 && !sensor4 && !sensor5 && !sensor6 && !sensor7 && !sensor8)
-        res += backDir;
+    if (P7->IN & 0b01100000)
+        res += 0b1000;//L
+
+    if (P7->IN & 0b00000110)
+        res += 0b0010;//R
+
+    if ((P7->IN & 0b00011000) == 0b00011000)
+        res += 0b0100;//S
+
+    if (P7->IN == 0)
+        res += 0b0001;//B
+
     return res;
 }
 
-void memorize_phase(int duty) {
-    int loopCount = -1, preCount = -1, turnCount = 0;
-    int left = 0, right = 0, b = 0;
+int main(void)
 
-    while (1) {
-        loopCount++;
-        if (b > 23) {
-            move(0, 0);
-            break;
-        }
-
-        int dir = direction();
-
-        if (dir % 10 >= 1) {
-            left = 1; right = 0;
-            move_front(duty, duty, 5);
-            turnCount = 0;
-            while (1) {
-                move_left(duty, duty, 1);
-                loadSensor();
-                if (sensor4 && sensor5) break;
-                turnCount++;
-            }
-            if (turnCount > 40 && loopCount - preCount > 50) {
-                path[path_index++] = LEFT;
-                preCount = loopCount;
-            }
-        } else if (dir % 100 >= 10) {
-            if (loopCount - preCount > 50 && ((sensor2 && sensor3 && sensor4 && sensor5) || (sensor4 && sensor5 && sensor6 && sensor7))) {
-                path[path_index++] = STRAIGHT;
-                preCount = loopCount;
-            }
-            move_front(duty, duty, 1);
-        } else if (dir % 1000 >= 100) {
-            right = 1; left = 0;
-            move_front(duty, duty, 5);
-            turnCount = 0;
-            while (1) {
-                move_right(duty, duty, 5);
-                loadSensor();
-                if (sensor4 && sensor5) break;
-                turnCount++;
-            }
-            if (turnCount > 40 && loopCount - preCount > 50) {
-                path[path_index++] = RIGHT;
-                preCount = loopCount;
-            }
-        } else if ((left || right) && dir >= 1000) {
-            move_front(duty, duty, 5);
-            turnCount = 0;
-            if (left) while (1) {
-                move_left(duty, duty, 1);
-                loadSensor();
-                if (sensor4 && sensor5) break;
-                turnCount++;
-            } else while (1) {
-                move_right(duty, duty, 1);
-                loadSensor();
-                if (sensor4 && sensor5) break;
-                turnCount++;
-            }
-            if (turnCount > 800) {
-                path[path_index++] = BACK;
-                b++;
-            } else if (turnCount > 40 && loopCount - preCount > 50) {
-                path[path_index++] = (left ? LEFT : RIGHT);
-                preCount = loopCount;
-            }
-        }
-    }
-}
-
-void optimize_path() {
+{
+    Led_Init();
+    System_Initialize();
+    uint16_t duty = 1700;
+    int left = 0;
+    int right = 0;
+    int b = 0;
+    int turnCount = 0;
+    int rotCnt = 0;
+    int index = 0;
+    int loopCount = -1;
+    int preCount = -1;
+    int branch = 0;
+    char lst[1000];
     int i;
-    for (i = 0; i < path_index - 2; i++) {
-        if (path[i] == LEFT && path[i + 1] == BACK && path[i + 2] == RIGHT) {
-            optimized[optimized_index++] = BACK;
-            i += 2;
-        }
-        else if (path[i] == LEFT && path[i + 1] == BACK && path[i + 2] == STRAIGHT) {
-            optimized[optimized_index++] = RIGHT;
-            i += 2;
-        }
-        else if (path[i] == RIGHT && path[i + 1] == BACK && path[i + 2] == LEFT) {
-            optimized[optimized_index++] = BACK;
-            i += 2;
-        }
-        else if (path[i] == STRAIGHT && path[i + 1] == BACK && path[i + 2] == LEFT) {
-            optimized[optimized_index++] = RIGHT;
-            i += 2;
-        }
-        else if (path[i] == STRAIGHT && path[i + 1] == BACK && path[i + 2] == STRAIGHT) {
-            optimized[optimized_index++] = BACK;
-            i += 2;
-        }
-        else if (path[i] == LEFT && path[i + 1] == BACK && path[i + 2] == LEFT) {
-            optimized[optimized_index++] = STRAIGHT;
-            i += 2;
-        }
-        else {
-            optimized[optimized_index++] = path[i];
-        }
+    for (i = 0; i<1000; i++) {
+        lst[i] = 'N';
     }
 
-    while (i < path_index) {
-        optimized[optimized_index++] = path[i++];
-    }
-}
-
-void follow_path(const char* route, int length, int duty) {
-    int loopCount = -1, preCount = -1, index = 0;
-    while (index < length) {
+    //phase 1
+    while (1)
+    {
         loopCount++;
-        if (loopCount - preCount > 50) {
-            loadSensor();
-            if ((sensor2 && sensor3 && sensor4 && sensor5) || (sensor4 && sensor5 && sensor6 && sensor7)) {
-                char dir = route[index++];
-                if (dir == LEFT) {
-                    move_front(duty, duty, 5);
-                    while (1) {
-                        move_left(duty, duty, 10);
-                        loadSensor();
 
-                        if (sensor4 && sensor5) break;
-                    }
-                } else if (dir == STRAIGHT) {
-                    move_front(duty, duty, 5);
-                } else if (dir == RIGHT) {
-                    move_front(duty, duty, 5);
-                    while (1) {
-                        move_right(duty, duty, 10);
-                        loadSensor();
+        //endPoint - end phase 1 and proceed to phase 2
+        loadSensor();
 
-                        if (sensor4 && sensor5) break; }
-                } else if (dir == BACK) {
-                    while (1) {
-                        move_left(duty, duty, 1);
-                        loadSensor();
+//        if(branch == 2){
+//            Move(0, 0);
+//            Clock_Delay1us(10000);
+//        }
 
-                        if (sensor4 && sensor5) break; }
+        int way = direction(duty);
+
+
+        if(branch == 2){
+            turnCount = 0;
+            TurnOff_Led();
+            TurnOn_Led(GREEN);
+            while(1){
+
+                moveLeft(duty, duty, 5000);
+                if(turnCount > 180){
+                    branch++;
+                    break;
                 }
+                turnCount++;
+            }
+
+            turnCount = 0;
+            while(1){
+                moveForward(duty, duty, 5000);
+                if(turnCount > 250){
+                    break;
+                }
+                turnCount++;
+
+            }
+
+        }
+        //go right
+        else if (way & 0b0010) {
+            loadSensor();
+            right = 1;
+            left = 0;
+            moveForward(duty, duty, 5000);
+            turnCount = 0;
+            while (1) {
+                moveRight(duty, duty, 1000);
+                loadSensor();
+                if ((P7->IN & 0b00011000) == 0b00011000) {
+                    moveRight(duty, duty, 5000);
+                    break;
+                }
+                turnCount++;
+            }
+
+            if (turnCount>130) {
+                lst[index] = 'r';
+                index++;
+                branch++;
+            }
+        }
+        //go straight
+        else if (way & 0b0100) {
+            if (loopCount-preCount>50) {
+                loadSensor();
+                if ((P7->IN & 0b01111000) == 0b01111000||(P7->IN & 0b00011110) == 0b00011110) {
+                    lst[index] = 's';
+                    index++;
+                    preCount = loopCount;
+                }
+            }
+            moveForward(duty, duty, 5000);
+        }
+        //go left
+        else if (way & 0b1000) {
+            left = 1;
+            right = 0;
+            moveForward(duty, duty, 5000);
+            turnCount = 0;
+            while (1) {
+                moveLeft(duty, duty, 1000);
+                loadSensor();
+                if ((P7->IN & 0b00011000) == 0b00011000) {
+                    moveLeft(duty, duty, 5000);
+                    break;
+                }
+                turnCount++;
+            }
+            if (turnCount>130) {
+                lst[index] = 'l';
+                index++;
                 preCount = loopCount;
             }
         }
+        else if ((left==1) && (way & 0b0001)) {
+            moveForward(duty, duty, 5000);
+            turnCount = 0;
+            while (1) {
+                moveLeft(duty, duty, 1000);
+                loadSensor();
+                if ((P7->IN & 0b00011000) == 0b00011000) {
+                    moveLeft(duty, duty, 3200);
+                    break;
+                }
+                turnCount++;
+            }
+            if (turnCount>800) {
+                lst[index] = 'b';
+                index++;
+                b++;
+                TurnOff_Led();
+                TurnOn_Led(GREEN);
+            }
+            else if (turnCount>40 && loopCount-preCount>50) {
+                lst[index] = 'l';
+                index++;
+                TurnOff_Led();
+                TurnOn_Led(RED);
+                preCount = loopCount;
+            }
+        }
+        else if ((right==1) && (way & 0b0001)) {
+            moveForward(duty, duty, 5000);
+            turnCount = 0;
+            while (1) {
+                moveRight(duty, duty, 1000);
+                loadSensor();
+                if ((P7->IN & 0b00011000) == 0b00011000) {
+                    moveRight(duty, duty, 3200);
+                    break;
+                }
+                turnCount++;
+            }
+            if (turnCount>800) {
+                lst[index] = 'b';
+                index++;
+                b++;
+                TurnOff_Led();
+                TurnOn_Led(GREEN);
+            }
+            else if (turnCount>40 && loopCount-preCount>50) {
+                lst[index] = 'r';
+                index++;
+                TurnOff_Led();
+                TurnOn_Led(BLUE);
+                preCount = loopCount;
+            }
+
+        }
+        //else follow trace
     }
-}
-
-int main(void) {
-    motor_init();
-    Clock_Init48MHz();
-    uint16_t duty = 1300;
-
-    // phase 1
-    memorize_phase(duty);
-    // phase 2
-    follow_path(path, path_index, duty); // follow memorized path
-    optimize_path();          // optimize route for phase3
-    Clock_Delay1ms(10000);
-    // phase 3
-    follow_path(optimized, optimized_index, duty); // fast escape
-
-    return 0;
 }
